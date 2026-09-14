@@ -82,11 +82,16 @@ async function runReconnectSyncTests() {
   console.log('✓ Test 2 Passed: Server returned OPERATION_ACK (accepted: false) without crash.\n');
 
   // ----------------------------------------------------
-  // Test 3: Idempotent duplicate operationId receives OPERATION_ACK (accepted: true, ALREADY_CANONICAL)
+  // Test 3: Idempotent duplicate operationId receives OPERATION_ACK (accepted: true, ALREADY_CANONICAL) and zero ERROR events
   // ----------------------------------------------------
-  console.log('[Test 3] Server acknowledges duplicate operationId idempotently...');
+  console.log('[Test 3] Server acknowledges duplicate operationId idempotently without ERROR...');
+  const errorsA1 = [];
+  const errorHandler = (err) => errorsA1.push(err);
+  clientA1.on('ERROR', errorHandler);
+
   clientA1.emit('OPERATION_APPLY', { operation: op1 });
   await wait(120);
+  clientA1.off('ERROR', errorHandler);
 
   const dupAck = acksA1.filter((a) => a.operationId === 'op_rec_1');
   if (dupAck.length < 2) {
@@ -96,7 +101,10 @@ async function runReconnectSyncTests() {
   if (!lastDupAck.accepted || lastDupAck.reason !== 'ALREADY_CANONICAL') {
     throw new Error(`Test 3 Failed: Unexpected duplicate ack: ${JSON.stringify(lastDupAck)}`);
   }
-  console.log('✓ Test 3 Passed: Duplicate operation acknowledged as ALREADY_CANONICAL without duplicate strokes.\n');
+  if (errorsA1.length > 0) {
+    throw new Error(`Test 3 Failed: Server emitted misleading ERROR event on duplicate retry: ${JSON.stringify(errorsA1)}`);
+  }
+  console.log('✓ Test 3 Passed: Duplicate operation acknowledged as ALREADY_CANONICAL without duplicate strokes or ERROR.\n');
 
   // ----------------------------------------------------
   // Test 4: Offline queued operations replay on reconnect

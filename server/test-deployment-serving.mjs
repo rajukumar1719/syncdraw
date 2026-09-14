@@ -119,8 +119,89 @@ async function runTests() {
 
   console.log('✓ Test 6 Passed: Socket.IO connected and joined room on unified server.');
 
+  // Test 7: GET /favicon.svg returns 200 with SVG content
+  console.log('[Test 7] Verifying /favicon.svg returns 200 with SVG content...');
+  const faviconRes = await fetch(`${SERVER_URL}/favicon.svg`);
+  if (faviconRes.status !== 200) {
+    throw new Error(`Expected HTTP 200 for /favicon.svg, got ${faviconRes.status}`);
+  }
+  const faviconText = await faviconRes.text();
+  if (!faviconText.includes('<svg') || !faviconText.includes('</svg>')) {
+    throw new Error('Expected valid SVG content in /favicon.svg');
+  }
+  console.log('✓ Test 7 Passed: /favicon.svg returned valid SVG asset.');
+
+  // Test 8: Idempotent duplicate operation retry returns accepted ACK and ZERO ERROR events
+  console.log('[Test 8] Verifying duplicate operation retry returns accepted ACK and ZERO error events...');
+  const opSocket = io(SERVER_URL, {
+    transports: ['websocket'],
+    forceNew: true,
+  });
+
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      opSocket.disconnect();
+      reject(new Error('Test 8 timed out'));
+    }, 5000);
+
+    const receivedErrors = [];
+    opSocket.on('ERROR', (err) => receivedErrors.push(err));
+
+    opSocket.on('connect', () => {
+      opSocket.emit('JOIN_ROOM', { roomId: 'TEST_IDEMPOTENT_ROOM', displayName: 'RetryTester' });
+    });
+
+    opSocket.on('ROOM_JOINED', () => {
+      const testOpId = `op_idempotent_${Date.now()}`;
+      const op = {
+        operationId: testOpId,
+        type: 'clear-canvas',
+      };
+
+      // First submit
+      opSocket.emit('OPERATION_APPLY', { operation: op });
+
+      let firstAckReceived = false;
+      opSocket.on('OPERATION_ACK', (ack) => {
+        if (ack.operationId === testOpId) {
+          if (!firstAckReceived) {
+            firstAckReceived = true;
+            if (!ack.accepted) {
+              opSocket.disconnect();
+              reject(new Error(`First operation submission was not accepted: ${JSON.stringify(ack)}`));
+              return;
+            }
+            // Second submit (retry / replay)
+            opSocket.emit('OPERATION_APPLY', { operation: op });
+          } else {
+            // Duplicate ack
+            clearTimeout(timeout);
+            opSocket.disconnect();
+            if (!ack.accepted || ack.reason !== 'ALREADY_CANONICAL') {
+              reject(new Error(`Expected accepted ALREADY_CANONICAL ack, got: ${JSON.stringify(ack)}`));
+              return;
+            }
+            if (receivedErrors.length > 0) {
+              reject(new Error(`Expected ZERO error events on duplicate retry, got: ${JSON.stringify(receivedErrors)}`));
+              return;
+            }
+            resolve();
+          }
+        }
+      });
+    });
+
+    opSocket.on('connect_error', (err) => {
+      clearTimeout(timeout);
+      opSocket.disconnect();
+      reject(err);
+    });
+  });
+
+  console.log('✓ Test 8 Passed: Duplicate operation acknowledged as accepted without ERROR event.');
+
   console.log('\n===========================================================');
-  console.log('ALL UNIFIED DEPLOYMENT INTEGRATION TESTS PASSED! (6/6) 🎉');
+  console.log('ALL UNIFIED DEPLOYMENT INTEGRATION TESTS PASSED! (8/8) 🎉');
   console.log('===========================================================\n');
 }
 
