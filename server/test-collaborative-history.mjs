@@ -193,10 +193,18 @@ async function runCollaborativeHistoryTests() {
   console.log(`✓ Test 6 Passed: Cross-author mutation cleanly rejected with code "${lastBobError.code}".\n`);
 
   // ----------------------------------------------------
-  // Test 7: Duplicate operationId is ignored
+  // Test 7: Duplicate operationId is handled idempotently without error
   // ----------------------------------------------------
-  console.log('[Test 7] Verify duplicate operationId is rejected...');
+  console.log('[Test 7] Verify duplicate operationId is acknowledged as ALREADY_CANONICAL without ERROR...');
   const initialAliceErrors = aliceErrors.length;
+  let duplicateAck = null;
+  const ackListener = (ack) => {
+    if (ack.operationId === 'op_a1') {
+      duplicateAck = ack;
+    }
+  };
+  clientA.on('OPERATION_ACK', ackListener);
+
   // Send op_a1 again
   clientA.emit('OPERATION_APPLY', {
     operation: {
@@ -208,11 +216,15 @@ async function runCollaborativeHistoryTests() {
     },
   });
   await wait(150);
+  clientA.off('OPERATION_ACK', ackListener);
 
-  if (aliceErrors.length === initialAliceErrors) {
-    throw new Error('Test 7 Failed: Server accepted duplicate operationId without error!');
+  if (!duplicateAck || !duplicateAck.accepted || duplicateAck.reason !== 'ALREADY_CANONICAL') {
+    throw new Error(`Test 7 Failed: Expected ALREADY_CANONICAL accepted ACK, got: ${JSON.stringify(duplicateAck)}`);
   }
-  console.log('✓ Test 7 Passed: Duplicate operationId rejected.\n');
+  if (aliceErrors.length !== initialAliceErrors) {
+    throw new Error(`Test 7 Failed: Server emitted misleading ERROR event on duplicate operation! ${JSON.stringify(aliceErrors.slice(initialAliceErrors))}`);
+  }
+  console.log('✓ Test 7 Passed: Duplicate operationId idempotently acknowledged without ERROR.\n');
 
   // ----------------------------------------------------
   // Test 8: Collaborative clear reaches all clients
