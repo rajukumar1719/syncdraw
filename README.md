@@ -7,7 +7,7 @@ SyncDraw is a high-performance, real-time collaborative drawing canvas and white
 ## Features
 
 - **Real-Time Vector Sync**: Synchronizes lightweight vector operations (`DRAW_START`, `DRAW_UPDATE`, `DRAW_END`, `ERASE_STROKES`) rather than heavy canvas screenshots or bitmap diffs.
-- **Local-First Zero-Latency Rendering**: Local strokes render instantaneously at native display refresh rates (60–120 FPS); network broadcasts are batched in ~25ms intervals.
+- **Local-First Zero-Latency Rendering**: Local strokes render instantaneously at native display refresh rates (60-120 FPS); network broadcasts are batched in ~25ms intervals.
 - **Drawing Tools**: Pen, Highlighter (`0.35` alpha), and stroke-level Eraser with geometric point-to-segment hit detection.
 - **Live Collaborative Cursors & Presence**: Decoupled GPU-accelerated cursor overlay (`translate3d`) with 30ms rate limiting, 6-second inactivity fading, and real-time collaborator presence roster with initial avatars.
 - **Author-Scoped Collaborative History**: Non-destructive operation log allowing collaborators to undo and redo their own mutations without altering peers' drawings. Includes collaborative, reversible canvas clearing.
@@ -24,30 +24,30 @@ SyncDraw pairs a React single-page frontend with an event-driven Node.js backend
 
 ```text
 Browser Client A (Desktop)           Browser Client B (Mobile)
-       ¦                                     ¦
-       ¦ HTTPS                               ¦ HTTPS
+       |                                     |
+       | HTTPS                               | HTTPS
        ?                                     ?
 Static Frontend (Vite SPA)           Static Frontend (Vite SPA)
-       ¦                                     ¦
-       ¦ WSS / Socket.IO (Port 443)          ¦ WSS / Socket.IO (Port 443)
+       |                                     |
+       | WSS / Socket.IO (Port 443)          | WSS / Socket.IO (Port 443)
        ?                                     ?
 +------------------------------------------------------------------------+
-¦                   SyncDraw Real-Time Server Gateway                    ¦
-¦             (Express HTTP + Socket.IO on Node.js / TS)                 ¦
+|                   SyncDraw Real-Time Server Gateway                    |
+|             (Express HTTP + Socket.IO on Node.js / TS)                 |
 +------------------------------------------------------------------------+
-                                    ¦
+                                    |
                          +---------------------+
-                         ¦ In-Memory Registry  ¦
-                         ¦    (RoomManager)    ¦
+                         | In-Memory Registry  |
+                         |    (RoomManager)    |
                          +---------------------+
-                                    ¦
+                                    |
              +---------------------------------------------+
              ?                                             ?
 +-------------------------+                   +-------------------------+
-¦       Room ABC123       ¦                   ¦       Room XYZ789       ¦
-¦  +-- User A (#4f46e5)   ¦                   ¦  +-- User C (#0891b2)   ¦
-¦  +-- User B (#059669)   ¦                   ¦                         ¦
-¦  (Isolated Namespace)   ¦                   ¦  (Isolated Namespace)   ¦
+|       Room ABC123       |                   |       Room XYZ789       |
+|  +-- User A (#4f46e5)   |                   |  +-- User C (#0891b2)   |
+|  +-- User B (#059669)   |                   |                         |
+|  (Isolated Namespace)   |                   |  (Isolated Namespace)   |
 +-------------------------+                   +-------------------------+
 ```
 
