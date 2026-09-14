@@ -160,6 +160,12 @@ export const RoomPage: React.FC = () => {
             appliedOperationIds.current.add(rec.operation.operationId);
           }
         }
+        if (data.strokes && data.strokes.length > 0) {
+          for (const s of data.strokes) {
+            canonicalOpIds.add(`op_${s.id}`);
+            appliedOperationIds.current.add(`op_${s.id}`);
+          }
+        }
 
         // Reconcile local pending queue: drop operations already canonical on server
         const opsToReplay = queueRef.current?.reconcileWithCanonical(canonicalOpIds) || [];
@@ -187,6 +193,10 @@ export const RoomPage: React.FC = () => {
       },
       onOperationApplied: (data) => {
         const op = data.operation;
+        // Even if ack was lost or delayed, an operation applied broadcast confirms it is canonical
+        queueRef.current?.acknowledge(op.operationId);
+        setPendingCount(queueRef.current?.getPendingCount() || 0);
+
         if (appliedOperationIds.current.has(op.operationId)) {
           setOperations((prev) => {
             if (prev.some((r) => r.operation.operationId === op.operationId)) return prev;
