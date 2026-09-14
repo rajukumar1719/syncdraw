@@ -488,30 +488,27 @@ Section 11 hardens SyncDraw against realistic web application and WebSocket abus
 
 ## 10. Production Deployment & Runtime Architecture (Section 13)
 
-### 10.1 Network Topology & Multi-Tier Runtime
+### 10.1 Primary Production Architecture: Unified Single-Service (Railway)
+
+SyncDraw's primary production deployment is hosted on **Railway** (`https://syncdraw-production.up.railway.app`) as a unified, full-stack Node.js container service.
 
 ```text
 Browser Client A (Desktop)             Browser Client B (Mobile)
        │                                       │
-       │ HTTPS (TLS 1.3)                       │ HTTPS (TLS 1.3)
+       │ HTTPS / TLS 1.3                       │ HTTPS / TLS 1.3
        ▼                                       ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│                   Production Static Host / CDN                         │
-│       (Render Static Site / Vercel / Netlify / Cloudflare Pages)       │
-│                 Serves precompiled client/dist assets                  │
-│               SPA Route Fallback: /* -> /index.html (200)              │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                                    │ WSS / Socket.IO (Port 443)
-                                    │ Upgrade: websocket
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                   SyncDraw Real-Time Server Gateway                    │
-│          (Render Web Service / Persistent Node.js 20+ Runtime)         │
-│          Entrypoint: node server/dist/server.js (via npm start)        │
-│          Dynamic Port Binding: process.env.PORT || 5000                │
-│          Defensive Headers: nosniff, DENY framing, origin CSP          │
-│          CORS Enforcement: CLIENT_ORIGIN / CLIENT_URL verification     │
+│                   Railway Unified Single-Service Container             │
+│                 (https://syncdraw-production.up.railway.app)           │
+│                                                                        │
+│  1. Monorepo Build: npm run build (server + client)                   │
+│  2. Persistent Process: npm run start (node dist/server.js)            │
+│  3. Robust ESM Static Serving: client/dist via express.static()        │
+│  4. SPA Route Fallback: / & /room/:roomId -> client/dist/index.html    │
+│  5. 404 Pass-through: missing static assets & /api/* -> JSON 404       │
+│  6. Dynamic Port: process.env.PORT || 5000 (0.0.0.0)                  │
+│  7. Health Check: GET /health -> JSON 200 OK                           │
+│  8. Single-Origin WebSocket Gateway: Socket.IO over WSS                │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
                          ┌──────────┴──────────┐
@@ -529,17 +526,33 @@ Browser Client A (Desktop)             Browser Client B (Mobile)
 └─────────────────────────┘                   └─────────────────────────┘
 ```
 
-### 10.2 Hosting Mechanics
+#### Unified Architecture Highlights:
+1. **Zero Cross-Origin Friction**:
+   Because both the client bundle and the Socket.IO WebSocket gateway are served from the identical origin (`https://syncdraw-production.up.railway.app`), browser cross-origin preflight checks (CORS OPTIONS) and cross-domain cookie/transport handshakes are completely eliminated.
+2. **Robust ESM Path Resolution**:
+   Static file paths are computed dynamically using `fileURLToPath(import.meta.url)` and `path.resolve(__dirname, '../../client/dist')`, avoiding fragile assumptions about current working directories across container platforms.
+3. **SPA Direct Navigation**:
+   Client routes such as `/` and `/room/:roomId` resolve directly to `client/dist/index.html`. Requests with file extensions (e.g. `.js`, `.css`, `.map`) bypass the SPA fallback to prevent false `200` responses on missing bundles, routing cleanly to the 404 JSON error handler.
+
+---
+
+### 10.2 Alternative Architecture: Split Multi-Tier (Render Blueprint)
+
+SyncDraw also maintains native support for split multi-tier hosting via `render.yaml`:
+- **Frontend Static Site**: Serves `client/dist` on a global CDN edge with `client/public/_redirects` handling `/* -> /index.html 200`.
+- **Backend Web Service**: Persistent Node.js service running Express and Socket.IO with strict CORS whitelist validation against `CLIENT_ORIGIN`.
+
+---
+
+### 10.3 Hosting Mechanics & Operational Guarantees
 1. **Persistent WebSocket Service**:
    - The backend runs as a continuous, stateful Node.js process (`node dist/server.js`).
    - Serverless functions are incompatible because they cannot maintain long-lived Socket.IO WebSocket connections.
 2. **Single-Node In-Memory Boundary**:
    - `RoomManager`, active collaborator rosters, and token-bucket rate limiters reside in process heap memory.
    - Horizontal clustering across multiple servers would require an external pub/sub coordinator (such as Redis with `@socket.io/redis-adapter`), which is outside the current scope.
-3. **SPA Client-Side Routing**:
-   - Direct navigation to `/room/:roomId` is rewritten to `/index.html` via `client/public/_redirects` (`/* /index.html 200`).
-4. **Health Check Probes**:
-   - Lightweight unauthenticated health endpoint (`GET /health`) allows PaaS load balancers to confirm uptime without database overhead.
+3. **Health Check Probes**:
+   - Lightweight unauthenticated health endpoint (`GET /health`) allows PaaS load balancers to confirm container uptime without disk or database overhead.
 
 ---
 
