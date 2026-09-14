@@ -383,10 +383,6 @@ export function initSocketServer(
           accepted: true,
           reason: 'ALREADY_CANONICAL',
         });
-        socket.emit('ERROR', {
-          code: 'DUPLICATE_OPERATION',
-          message: `Operation ${operation.operationId} has already been applied.`,
-        });
         return;
       }
 

@@ -278,10 +278,9 @@ export class RoomManager {
     if (room.appliedOperationIds.has(op.operationId)) {
       const existingRecord = room.operationMap.get(op.operationId) || room.operations.find((r) => r.operation.operationId === op.operationId);
       return {
-        success: false,
+        success: true,
         duplicate: true,
         record: existingRecord,
-        error: { code: 'DUPLICATE_OPERATION', message: `Operation ${op.operationId} has already been applied.` },
       };
     }
 
