@@ -33,7 +33,6 @@ services:
     name: syncdraw-frontend
     env: static
     plan: free
-    region: oregon
     buildCommand: npm install && npm run build:client
     staticPublishPath: client/dist
     autoDeploy: true
