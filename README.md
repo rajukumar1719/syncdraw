@@ -137,13 +137,36 @@ node server/dist/server.js
 
 SyncDraw requires a **persistent Node.js process** for the backend to support long-lived Socket.IO WebSocket connections. Serverless platforms (e.g. AWS Lambda without WebSockets) are incompatible.
 
-### Recommended Provider: Render (Infrastructure Blueprint)
+### Primary Deployment: Railway (Unified Single-Service)
 
-The repository includes a production-ready `render.yaml` blueprint deploying:
+SyncDraw is deployed in production on **Railway** as a unified full-stack service:
+- **Production URL**: `https://syncdraw-production.up.railway.app`
+- **Architecture**: A single persistent Node.js service builds both `server` and `client`, then runs Express to serve both the React/Vite single-page application and the Socket.IO WebSocket gateway from the same port and origin.
+
+#### How It Works:
+1. **Unified Root Lifecycle**:
+   - **Build Command**: `npm run build` (executes `npm run build -w server && npm run build -w client`).
+   - **Start Command**: `npm run start` (executes `npm run start -w server` -> `node dist/server.js`).
+2. **Static Asset Serving & Robust Path Resolution**:
+   - The Express server dynamically resolves the client bundle at `client/dist` using Node ESM-compatible path resolution (`fileURLToPath(import.meta.url)`).
+   - Static files (`/assets/*`, `/favicon.svg`, etc.) are served directly via `express.static()`.
+3. **SPA Client-Side Route Fallback**:
+   - Direct navigation and page refreshes on routes such as `/` and `/room/:roomId` serve `client/dist/index.html`.
+   - Requests for missing static assets with file extensions (e.g. `.js`, `.css`, `.png`) or unknown `/api/*` routes fall through to the structured 404 JSON error handler.
+4. **Unified Origin & WebSocket Gateway**:
+   - The React frontend and Socket.IO WebSocket server share the exact same host and port (`443` over HTTPS/WSS), eliminating cross-origin complications and proxy latency.
+5. **Dynamic Port Binding**:
+   - The server binds dynamically to `process.env.PORT || 5000` (`0.0.0.0`), complying with Railway's container port injection.
+6. **Health Check Probes**:
+   - Lightweight unauthenticated health endpoint (`GET /health`) returns JSON `200 OK` for Railway health checks and uptime monitoring.
+
+### Alternative Deployment: Render (Split Multi-Tier Blueprint)
+
+The repository also includes a production-ready `render.yaml` blueprint deploying:
 1. **Backend**: Render Web Service (persistent Node.js + Express + Socket.IO on Starter/Standard tier).
 2. **Frontend**: Render Static Site (Vite Single Page Application on Free/Static tier).
 
-#### Step-by-Step Deployment Steps:
+#### Step-by-Step Render Deployment:
 
 1. **Push repository to GitHub**:
    Ensure all changes are committed and pushed to your GitHub repository.
@@ -168,7 +191,7 @@ The repository includes a production-ready `render.yaml` blueprint deploying:
    - The `client/public/_redirects` file guarantees SPA fallback (`/* /index.html 200`) for direct `/room/:roomId` links.
 
 ### Manual VPS / Docker / Alternative Deployment:
-For traditional Linux VPS (Ubuntu, Debian) or PaaS (Railway, Fly.io):
+For traditional Linux VPS (Ubuntu, Debian) or PaaS (Fly.io, Heroku):
 - **Backend**: Execute `npm install && npm run build:server`, run `npm run start -w server` via `pm2` or `systemd`, reverse-proxy through Nginx with WebSocket upgrade headers (`Upgrade $http_upgrade`, `Connection "upgrade"`), and configure SSL via Let's Encrypt Certbot.
 - **Frontend**: Serve `client/dist` via Nginx, Caddy, Vercel, or Cloudflare Pages with SPA rewrite `try_files $uri $uri/ /index.html =404;`.
 
