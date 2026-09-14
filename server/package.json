@@ -13,7 +13,8 @@
     "test:history": "node test-collaborative-history.mjs",
     "test:reconnect": "node test-reconnect-sync.mjs",
     "test:performance": "node test-performance.mjs",
-    "test:security": "node test-security.mjs"
+    "test:security": "node test-security.mjs",
+    "test:deploy": "node test-deployment-serving.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",

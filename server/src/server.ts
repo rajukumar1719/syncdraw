@@ -107,7 +107,7 @@ if (hasClientDist) {
   // SPA Route Fallback: serve index.html for GET requests that don't match API/socket routes
   app.get('*', (req: Request, res: Response, next: NextFunction) => {
     // If it's a request for a missing static file with an extension, pass through to 404 handler
-    if (path.extname(req.path)) {
+    if (path.extname(req.path) || req.path.startsWith('/api/')) {
       return next();
     }
     res.sendFile(clientIndexPath);
